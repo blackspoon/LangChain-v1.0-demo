@@ -1,0 +1,31 @@
+# LangChain 1.0 主包
+langchain==1.0.3
+
+# 社区集成（与 1.0 匹配的 0.3 系列）
+langchain-community==0.3.31
+
+# OpenAI 适配 —— 必须是 1.0 系列，否则与 core 1.0 不兼容
+langchain-openai==1.0.2
+
+# Ollama 适配
+langchain-ollama>=0.1.0
+
+# 辅助依赖，降低 3.13 解析回溯
+pydantic>=2.12
+typing-extensions>=4.15
+python-dotenv>=1.0.0
+
+# 数据库依赖
+psycopg2-binary>=2.9.0
+sqlalchemy>=2.0.0
+langchain-milvus==0.3.0
+
+# MCP 依赖
+mcp>=1.21.0
+langchain-mcp-adapters>=0.1.12
+
+# 其他依赖
+dashscope>=1.24.9
+streamlit==1.51.0
+pypdf==6.2.0
+langchain-text-splitters==0.3.11

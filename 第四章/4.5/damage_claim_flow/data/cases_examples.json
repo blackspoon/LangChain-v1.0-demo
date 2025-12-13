@@ -1,0 +1,42 @@
+[
+  {
+    "id": "case-1",
+    "order_category": "fragile",
+    "order_amount": 188.0,
+    "damage_description": "玻璃花瓶运输途中破碎，收到时已经散架",
+    "decision": "全额退款",
+    "summary": "易碎品在签收时发现破损，且无法正常使用，直接全额退款。"
+  },
+  {
+    "id": "case-2",
+    "order_category": "fragile",
+    "order_amount": 89.0,
+    "damage_description": "陶瓷杯外包装完好，打开后杯口有明显缺口",
+    "decision": "全额退款",
+    "summary": "商品本体存在明显缺陷，直接全额退款，无需用户退回。"
+  },
+  {
+    "id": "case-3",
+    "order_category": "electronics",
+    "order_amount": 999.0,
+    "damage_description": "外包装压坏，机身有轻微划痕，功能正常",
+    "decision": "退款 15% + 优惠券",
+    "summary": "功能正常但外观受损，按约定标准部分退款，并额外给出下单优惠券。"
+  },
+  {
+    "id": "case-4",
+    "order_category": "electronics",
+    "order_amount": 2599.0,
+    "damage_description": "快递签收后发现屏幕碎裂，无法开机",
+    "decision": "全额退款",
+    "summary": "高价值电子产品在签收后即发现严重损坏，直接全额退款，并安排回收。"
+  },
+  {
+    "id": "case-5",
+    "order_category": "other",
+    "order_amount": 59.0,
+    "damage_description": "纸质书籍封面有折痕，内页完好",
+    "decision": "退款 10%",
+    "summary": "轻微外观瑕疵不影响阅读体验，按轻度破损标准给予小额赔付。"
+  }
+]

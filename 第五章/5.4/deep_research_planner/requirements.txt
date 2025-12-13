@@ -1,0 +1,24 @@
+# LangChain 1.0 主包
+langchain==1.0.3
+
+# LangGraph 主包
+langgraph==1.0.2
+
+# DeepAgents 主包
+deepagents==0.2.7
+
+# 社区集成
+langchain-community==0.3.31
+
+# OpenAI 适配
+langchain-openai==1.0.2
+
+# Tavily
+tavily==1.1.0
+tavily-python==0.7.13
+
+# DeepSeek
+langchain-deepseek==1.0.0
+
+# Streamlit
+streamlit==1.51.0

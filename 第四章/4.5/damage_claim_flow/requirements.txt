@@ -1,0 +1,18 @@
+# LangChain 1.0 主包
+langchain==1.0.3
+
+# LangGraph 主包
+langgraph==1.0.2
+
+# 社区集成
+langchain-community==0.3.31
+
+# OpenAI 适配（用于 DeepSeek）
+langchain-openai==1.0.2
+
+# DeepSeek（目前代码未直接用到，可以预留）
+langchain-deepseek==1.0.0
+
+# Streamlit 前端
+streamlit==1.51.0
+
