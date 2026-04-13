@@ -1,5 +1,8 @@
-# LangChain 1.0 主包
-langchain==1.0.3
+# LangChain 主包（需与 langgraph>=1.1.5 对齐，否则会出现
+# ImportError: cannot import name 'ExecutionInfo' from 'langgraph.runtime'）
+langchain==1.2.15
+# 与 langchain 1.2.x 的 Requires-Dist 一致，显式写出便于排查版本问题
+langgraph>=1.1.5,<1.2.0
 
 # 社区集成（与 1.0 匹配的 0.3 系列）
 langchain-community==0.3.31

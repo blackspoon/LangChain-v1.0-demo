@@ -12,11 +12,12 @@ from typing import List
 
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
-from langchain.messages import HumanMessage, AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from agent.prompts import SYSTEM_PROMPT
 from agent.mcp_tools import build_tools
 from agent.memory import build_memory, ConversationWindow
+from agent.message_sanitize import stringify_dialog
 from agent.middlewares import install_default_middlewares
 
 
@@ -35,7 +36,7 @@ class AgentRunner:
     def invoke(self, user_input: str) -> str:
         """单轮调用：拼接历史 + 本轮输入 -> 调用 Agent -> 回写记忆 -> 返回文本"""
         # 1) 拼接历史与当前输入（Messages 机制）
-        history: List = self.memory.get()
+        history: List = stringify_dialog(self.memory.get())
         print(f"-----> Runner: History: {history}")
         state = {"messages": history + [HumanMessage(content=user_input)]}
         print(f"-----> Runner: State: {state}")
@@ -48,7 +49,7 @@ class AgentRunner:
 
         # 3) 回写记忆为最新窗口
         # 因为 messages 本身已经包含了之前的历史 + 这次的新增消息，所以这里是“整体替换”而不是“在旧列表末尾 append”。
-        messages = new_state.get("messages", [])
+        messages = stringify_dialog(new_state.get("messages", []))
         self.memory.clear()
         self.memory.add(messages)
 

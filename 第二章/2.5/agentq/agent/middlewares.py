@@ -30,6 +30,8 @@ from langchain.agents.middleware import (
     SummarizationMiddleware,
 )
 
+from agent.message_sanitize import stringify_dialog, stringify_message
+
 # =========================================================
 # 1) 预置（Built-in）中间件
 # =========================================================
@@ -274,6 +276,41 @@ class ConversationGuardMiddleware(AgentMiddleware):
             last.content = last.content[: self.max_output_chars] + "\n…（已自动截断过长输出）"
             print("[中间件] ConversationGuard.after_model 生效：输出过长已截断。")
 
+
+class DeepSeekStrictContentMiddleware(AgentMiddleware):
+    """
+    在每次真正调用聊天模型前，把 ModelRequest 里所有消息的 content 压成字符串。
+    仅处理 runner 记忆不够覆盖的路径：ReAct 过程中模型返回的块列表会再次进入下一轮请求，
+    DeepSeek 会报 messages[n]: expected string, got sequence。
+    放在中间件列表末尾，使 wrap_model_call 处于最内层、紧邻模型调用。
+    """
+
+    @property
+    def name(self) -> str:
+        return "deepseek_strict_content"
+
+    def _sanitize_request(self, request: ModelRequest) -> ModelRequest:
+        overrides: dict = {"messages": stringify_dialog(request.messages)}
+        sys_m = request.system_message
+        if sys_m is not None and not isinstance(sys_m.content, str):
+            overrides["system_message"] = stringify_message(sys_m)
+        return request.override(**overrides)
+
+    def wrap_model_call(
+        self,
+        request: ModelRequest,
+        handler: Callable[[ModelRequest], ModelResponse | AIMessage],
+    ) -> ModelResponse | AIMessage:
+        return handler(self._sanitize_request(request))
+
+    async def awrap_model_call(
+        self,
+        request: ModelRequest,
+        handler: Callable[[ModelRequest], Awaitable[ModelResponse | AIMessage]],
+    ) -> ModelResponse | AIMessage:
+        return await handler(self._sanitize_request(request))
+
+
 # =========================================================
 # 4) 统一装配出口
 # =========================================================
@@ -295,5 +332,7 @@ def install_default_middlewares():
     print("[中间件] 会话治理中间件添加完成。")
     middlewares.extend(install_builtin_middlewares())
     print("[中间件] 官方内置中间件添加完成。")
+    middlewares.append(DeepSeekStrictContentMiddleware())
+    print("[中间件] DeepSeek 消息 content 规范化（wrap_model_call 最内层）已添加。")
     print(f"[中间件] 中间件列表就绪：{[mw.name if hasattr(mw, 'name') else type(mw).__name__ for mw in middlewares]}")
     return middlewares
