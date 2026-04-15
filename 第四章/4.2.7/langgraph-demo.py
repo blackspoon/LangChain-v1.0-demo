@@ -4,6 +4,7 @@ import operator
 from dataclasses import dataclass
 from typing import Annotated, Any, Dict, List, Literal, NotRequired, Optional, TypedDict
 
+import langchain
 from langgraph.func import entrypoint, task
 from langgraph.graph import START, END, StateGraph
 from langgraph.runtime import Runtime
@@ -11,6 +12,10 @@ from langgraph.types import Send
 from langgraph.checkpoint.memory import InMemorySaver
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage
+
+# Compatibility guard: some langchain builds don't expose `debug`.
+if not hasattr(langchain, "debug"):
+    langchain.debug = False
 
 def _call_chat_model(
     *,
@@ -112,7 +117,7 @@ def split_question(question: str) -> List[str]:
 def enrich_outline(segments: List[str]) -> List[str]:
     """生成章节标题"""
     outline = []
-    for idx, seg in enumerate[str](segments, 1):
+    for idx, seg in enumerate(segments, 1):
         outline.append(f"第{idx}节：{seg}")
     return outline
 
