@@ -1,10 +1,18 @@
+from pathlib import Path
+
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_writer.text_splitter import WriterTextSplitter
 from langchain_core.documents import Document
 
 
-file_path = "files/XX销售有限公司员工守则.pdf"
-loader = PyPDFLoader(file_path)
+file_path = Path(__file__).resolve().parent / "files" / "XX销售有限公司员工守则.pdf"
+if not file_path.exists():
+    raise FileNotFoundError(
+        f"未找到 PDF 文件：{file_path}\n"
+        "请确认已在当前目录下创建 files/XX销售有限公司员工守则.pdf"
+    )
+
+loader = PyPDFLoader(str(file_path))
 
 docs = loader.load()
 

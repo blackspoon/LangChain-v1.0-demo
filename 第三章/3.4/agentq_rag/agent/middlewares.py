@@ -13,7 +13,7 @@
 from __future__ import annotations
 
 import time
-from typing import Optional, Awaitable, Callable
+from typing import Any, Optional, Awaitable, Callable
 
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import ChatOpenAI
@@ -30,6 +30,57 @@ from langchain.agents.middleware import (
     SummarizationMiddleware,
 )
 
+
+def _stringify_message_content(content: Any) -> str:
+    """将模型/工具消息内容统一转换为字符串，兼容不接受数组内容的模型网关。"""
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict):
+                if isinstance(block.get("text"), str):
+                    parts.append(block["text"])
+                elif isinstance(block.get("content"), str):
+                    parts.append(block["content"])
+                else:
+                    parts.append(str(block))
+            else:
+                parts.append(str(block))
+        return "\n".join(p for p in parts if p)
+
+    return str(content)
+
+
+def _normalize_request_messages(req: ModelRequest) -> ModelRequest:
+    """
+    DeepSeek 兼容层：
+    工具消息可能是 list[dict]，而部分 OpenAI 兼容网关要求 message.content 必须是字符串。
+    """
+    changed = False
+    normalized_messages = []
+    for message in req.messages:
+        content = getattr(message, "content", "")
+        if isinstance(content, str):
+            normalized_messages.append(message)
+            continue
+
+        changed = True
+        normalized_content = _stringify_message_content(content)
+        if hasattr(message, "model_copy"):
+            normalized_messages.append(message.model_copy(update={"content": normalized_content}))
+        else:
+            message.content = normalized_content
+            normalized_messages.append(message)
+
+    if changed:
+        print("[中间件] 消息规范化生效：已将非字符串 content 转换为字符串。")
+        return req.override(messages=normalized_messages)
+    return req
+
 # =========================================================
 # 1) 预置（Built-in）中间件
 # =========================================================
@@ -41,7 +92,7 @@ def install_builtin_middlewares():
     print("[中间件] 开始安装官方内置 SummarizationMiddleware。")
     summ_llm = ChatOpenAI(
         model="deepseek-chat",
-        api_key="xxxxxx",
+        api_key="xxxxxxx",
         base_url="https://api.deepseek.com",
         temperature=0.0,
     )
@@ -170,6 +221,7 @@ def _timed_retry_wrapper_sync(
     retries: int = 1,
 ) -> ModelResponse | AIMessage:
     print("[中间件] timing_and_retry 同步封装开始。")
+    req = _normalize_request_messages(req)
     t0 = time.time()
     try:
         resp = call(req)
@@ -191,6 +243,7 @@ async def _timed_retry_wrapper_async(
     retries: int = 1,
 ) -> ModelResponse | AIMessage:
     print("[中间件] timing_and_retry 异步封装开始。")
+    req = _normalize_request_messages(req)
     t0 = time.time()
     try:
         resp = await call(req)

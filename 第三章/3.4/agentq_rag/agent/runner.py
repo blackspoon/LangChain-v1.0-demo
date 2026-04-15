@@ -9,9 +9,36 @@ Agent runner 模块：
 
 import asyncio
 from datetime import datetime
-from typing import List
+from typing import List, TypedDict
 
 from langchain_openai import ChatOpenAI
+
+# 兼容部分环境中 langgraph/runtime API 变动导致的导入失败
+try:
+    import langgraph.runtime as _langgraph_runtime
+
+    if not hasattr(_langgraph_runtime, "ExecutionInfo"):
+        class _ExecutionInfo(TypedDict, total=False):
+            request_id: str
+
+        _langgraph_runtime.ExecutionInfo = _ExecutionInfo
+
+    if not hasattr(_langgraph_runtime, "ServerInfo"):
+        class _ServerInfo(TypedDict, total=False):
+            server: str
+
+        _langgraph_runtime.ServerInfo = _ServerInfo
+
+    # 兼容 Runtime 对象缺少 execution_info/server_info 字段
+    if hasattr(_langgraph_runtime, "Runtime"):
+        if not hasattr(_langgraph_runtime.Runtime, "execution_info"):
+            _langgraph_runtime.Runtime.execution_info = None
+        if not hasattr(_langgraph_runtime.Runtime, "server_info"):
+            _langgraph_runtime.Runtime.server_info = None
+except Exception:
+    # 如果 langgraph 本身不可用，保持原始异常链路，由后续导入抛出更明确错误
+    pass
+
 from langchain.agents import create_agent
 from langchain.messages import HumanMessage, AIMessage
 
@@ -78,7 +105,7 @@ def build_runner() -> AgentRunner:
     # app_streamlit.py 在页面初始化时会调用此方法，确保界面加载后即可复用同一套配置。
     model = ChatOpenAI(
         model="deepseek-chat",
-        api_key="xxxxxx",
+        api_key="xxxxxxx",
         base_url="https://api.deepseek.com",
         temperature=0.3,
     )
