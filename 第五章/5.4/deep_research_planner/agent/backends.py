@@ -8,6 +8,10 @@
 from pathlib import Path
 from typing import Callable, Tuple
 
+from .compat import apply_langgraph_runtime_compat
+
+apply_langgraph_runtime_compat()
+
 from deepagents.backends import (
     CompositeBackend,
     StateBackend,

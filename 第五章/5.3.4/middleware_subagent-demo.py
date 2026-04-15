@@ -8,6 +8,7 @@ from langchain.tools import tool
 from langchain.agents import create_agent
 from langchain_deepseek import ChatDeepSeek
 from langchain.messages import HumanMessage
+from deepagents.backends import FilesystemBackend
 from deepagents.middleware.subagents import SubAgentMiddleware
 
 # 1. 定义子智能体要用到的工具
@@ -29,9 +30,8 @@ agent = create_agent(
     model=model,
     middleware=[
         SubAgentMiddleware(
-            # 主体默认模型与工具
-            default_model=model,
-            default_tools=[],
+            # 新版 SubAgentMiddleware 需要显式提供 backend
+            backend=FilesystemBackend(root_dir=".", virtual_mode=False),
             subagents=[
                 {
                     "name": "weather",

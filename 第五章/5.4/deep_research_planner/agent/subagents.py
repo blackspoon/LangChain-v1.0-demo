@@ -8,6 +8,11 @@
 from typing import Any, Dict, List, Literal
 
 from tavily import TavilyClient
+
+from .compat import apply_langgraph_runtime_compat
+
+apply_langgraph_runtime_compat()
+
 from deepagents import CompiledSubAgent
 from langchain_deepseek import ChatDeepSeek
 

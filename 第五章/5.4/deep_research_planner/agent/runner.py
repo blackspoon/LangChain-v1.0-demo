@@ -7,6 +7,10 @@ Agent 构建与调用入口。
 
 from typing import Any, Dict, List
 
+from .compat import apply_langgraph_runtime_compat
+
+apply_langgraph_runtime_compat()
+
 from deepagents import create_deep_agent
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
