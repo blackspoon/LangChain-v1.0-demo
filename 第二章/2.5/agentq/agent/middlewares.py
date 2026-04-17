@@ -131,18 +131,23 @@ def post_agent_logger(state: AgentState, *_args, **_kw) -> None:
     _log_after_agent(state)
 
 # 2.5 动态提示（示例：夜间更简洁）
-def _night_briefing_rule(state: AgentState) -> Optional[str]:
+# 注意：@dynamic_prompt 会把返回值包成 SystemMessage(content=prompt)。
+# 若返回 None，在 LangChain 1.2.x 会得到 SystemMessage(content=None)，触发 Pydantic 校验错误。
+# 白天必须返回「当前系统提示」字符串（见 ModelRequest.system_prompt），以保留 create_agent 的 system_prompt。
+def _night_briefing_rule(request: ModelRequest) -> str:
     hour = time.localtime().tm_hour
     print(f"[中间件] night_briefing 检查当前小时：{hour}")
+    base = request.system_prompt or ""
     if hour >= 23 or hour < 7:
         print("[中间件] night_briefing 生效：进入夜间简洁模式。")
-        return "夜间模式：请尽量简洁作答，不要过度展开。"
-    return None
+        suffix = "夜间模式：请尽量简洁作答，不要过度展开。"
+        return f"{base}\n\n{suffix}" if base else suffix
+    return base
 
 
 @dynamic_prompt()
-def night_briefing(state: AgentState, *_args, **_kw) -> Optional[str]:
-    return _night_briefing_rule(state)
+def night_briefing(request: ModelRequest) -> str:
+    return _night_briefing_rule(request)
 
 
 def install_decorator_middlewares():
