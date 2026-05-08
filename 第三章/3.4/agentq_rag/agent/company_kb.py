@@ -33,6 +33,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PDF_PATH = os.path.join(PROJECT_ROOT, "files", "XX销售有限公司员工守则.pdf")
 
 MILVUS_URI = "http://localhost:19530"
+MILVUS_ALIAS = "default"
 COLLECTION_NAME = "employee_handbook"
 
 DASHSCOPE_API_KEY = "xxxxxx"
@@ -46,18 +47,16 @@ EMBEDDING_MODEL = "text-embedding-v4"
 def _connect_milvus() -> None:
     """建立到 Milvus 的连接（幂等）。"""
     try:
-        # 检查连接是否已存在
+        # 检查连接是否已存在且可用
         existing_connections = connections.list_connections()
-        if "default" in existing_connections:
-            # 连接已存在，验证连接是否有效
+        if MILVUS_ALIAS in existing_connections:
             try:
-                connections.get_connection_addr("default")
+                utility.list_collections(using=MILVUS_ALIAS)
                 print(f"[RAG] Milvus连接已存在: {MILVUS_URI}")
                 return
             except Exception:
-                # 连接无效，断开后重新连接
                 try:
-                    connections.disconnect("default")
+                    connections.disconnect(MILVUS_ALIAS)
                 except Exception:
                     pass
     except Exception:
@@ -66,10 +65,19 @@ def _connect_milvus() -> None:
     
     # 建立新连接
     try:
-        connections.connect(alias="default", uri=MILVUS_URI)
+        connections.connect(alias=MILVUS_ALIAS, uri=MILVUS_URI)
         print(f"[RAG] Milvus连接已建立: {MILVUS_URI}")
     except Exception as e:
         raise ConnectionError(f"无法连接到 Milvus ({MILVUS_URI}): {e}") from e
+
+
+def _rebind_vectorstore_alias(alias: str) -> None:
+    """重绑 vectorstore 的运行时 alias，修复偶发的连接上下文丢失。"""
+    try:
+        connections.remove_connection(alias)
+    except Exception:
+        pass
+    connections.connect(alias=alias, uri=MILVUS_URI)
 
 
 # ============================================================================
@@ -89,12 +97,15 @@ def _get_embeddings() -> DashScopeEmbeddings:
 def get_company_vectorstore() -> Milvus:
     """获取公司知识库向量存储实例（缓存）。"""
     embeddings = _get_embeddings()
-    return Milvus(
+    vectorstore = Milvus(
         embedding_function=embeddings,
         collection_name=COLLECTION_NAME,
-        connection_args={"uri": MILVUS_URI},
+        connection_args={"uri": MILVUS_URI, "alias": MILVUS_ALIAS},
         index_params={"index_type": "FLAT", "metric_type": "L2"},
     )
+    # 兼容 pymilvus 新版连接管理：确保 ORM Collection(using=alias) 可用。
+    connections.connect(alias=vectorstore.alias, uri=MILVUS_URI)
+    return vectorstore
 
 
 # ============================================================================
@@ -115,14 +126,14 @@ def init_company_kb(delete_existing: bool = False) -> None:
         raise ConnectionError(f"无法连接到 Milvus: {e}") from e
 
     # 2. 处理现有集合
-    if delete_existing and utility.has_collection(COLLECTION_NAME):
+    if delete_existing and utility.has_collection(COLLECTION_NAME, using=MILVUS_ALIAS):
         try:
-            utility.drop_collection(COLLECTION_NAME)
+            utility.drop_collection(COLLECTION_NAME, using=MILVUS_ALIAS)
             print(f"[RAG] 已删除现有集合: {COLLECTION_NAME}")
         except Exception as e:
             raise RuntimeError(f"删除集合失败: {e}") from e
 
-    if (not delete_existing) and utility.has_collection(COLLECTION_NAME):
+    if (not delete_existing) and utility.has_collection(COLLECTION_NAME, using=MILVUS_ALIAS):
         get_company_vectorstore.cache_clear()
         print(f"[RAG] 集合已存在，跳过初始化: {COLLECTION_NAME}")
         return
@@ -156,13 +167,14 @@ def init_company_kb(delete_existing: bool = False) -> None:
         _connect_milvus()  # 确保连接已建立
         print(f"[RAG] 开始写入 Milvus 集合: {COLLECTION_NAME}")
         
-        Milvus.from_documents(
-            documents=split_docs,
-            embedding=embeddings,
-            connection_args={"uri": MILVUS_URI},
+        vector_store = Milvus(
+            embedding_function=embeddings,
             collection_name=COLLECTION_NAME,
+            connection_args={"uri": MILVUS_URI, "alias": MILVUS_ALIAS},
             index_params={"index_type": "FLAT", "metric_type": "L2"},
         )
+        connections.connect(alias=vector_store.alias, uri=MILVUS_URI)
+        vector_store.add_documents(split_docs)
         print(f"[RAG] 知识库初始化完成: {COLLECTION_NAME}")
         
         # 清除缓存，确保下次获取时使用最新的数据
@@ -172,13 +184,14 @@ def init_company_kb(delete_existing: bool = False) -> None:
         print(f"[RAG] 第一次写入失败，尝试重新连接: {e}")
         try:
             _connect_milvus()
-            Milvus.from_documents(
-                documents=split_docs,
-                embedding=embeddings,
-                connection_args={"uri": MILVUS_URI},
+            vector_store = Milvus(
+                embedding_function=embeddings,
                 collection_name=COLLECTION_NAME,
+                connection_args={"uri": MILVUS_URI, "alias": MILVUS_ALIAS},
                 index_params={"index_type": "FLAT", "metric_type": "L2"},
             )
+            _rebind_vectorstore_alias(vector_store.alias)
+            vector_store.add_documents(split_docs)
             print(f"[RAG] 知识库初始化完成（重试后）: {COLLECTION_NAME}")
             get_company_vectorstore.cache_clear()
         except Exception as retry_e:
@@ -202,7 +215,7 @@ def _search_company_policy(query: str) -> str:
     # 1. 检查连接和集合
     try:
         _connect_milvus()
-        if not utility.has_collection(COLLECTION_NAME):
+        if not utility.has_collection(COLLECTION_NAME, using=MILVUS_ALIAS):
             return "请先初始化知识库。"
     except Exception as e:
         print(f"[RAG] 连接Milvus失败: {e}")
@@ -231,6 +244,32 @@ def _search_company_policy(query: str) -> str:
             print(f"--------------------------------\n[RAG] 查询知识库完成: {chunks}")
         return "\n\n".join(chunks)
     except Exception as e:
+        # 连接上下文偶发丢失时重绑 alias 并重试一次。
+        if "should create connection first" in str(e):
+            try:
+                get_company_vectorstore.cache_clear()
+                vector_store = get_company_vectorstore()
+                _rebind_vectorstore_alias(vector_store.alias)
+                docs = vector_store.similarity_search(query, k=3)
+                if not docs:
+                    return (
+                        "【知识库无结果】未检索到与你问题相关的条款。\n"
+                        "你可以尝试换一种说法，或者咨询人力资源部门。"
+                    )
+
+                chunks: List[str] = []
+                for i, doc in enumerate(docs, start=1):
+                    metadata = doc.metadata if hasattr(doc, "metadata") else {}
+                    section = metadata.get("section") or metadata.get("page") or ""
+                    header = f"[条款 {i}]"
+                    if section:
+                        header = f"[条款 {i}] {section}"
+                    chunks.append(f"{header}\n{doc.page_content}")
+                return "\n\n".join(chunks)
+            except Exception as retry_e:
+                print(f"[RAG] 查询知识库重试失败: {retry_e}")
+                return f"查询知识库时发生错误：{str(retry_e)}。请检查知识库是否已正确初始化。"
+
         print(f"[RAG] 查询知识库失败: {e}")
         return f"查询知识库时发生错误：{str(e)}。请检查知识库是否已正确初始化。"
 
